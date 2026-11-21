@@ -9,6 +9,16 @@ public class WolfBehaviour : MonoBehaviour
     [SerializeField] private float maxTurnDelay = 9f;
     [SerializeField] private float fieldHalfSize = 20f;
 
+    [Header("Chasse")]
+    [SerializeField] private float visionRadius = 10f;
+    [SerializeField] private float chaseSpeed = 4f;
+    [SerializeField] private float chaseTurnSpeed = 270f;
+
+    [Header("Animation")]
+    [SerializeField] private Animator animator;            // l'Animator du modele (enfant)
+
+    private static readonly int IsChasingHash = Animator.StringToHash("IsChasing");
+
     private Quaternion targetRotation;
     private float nextTurnTime;
 
@@ -16,11 +26,73 @@ public class WolfBehaviour : MonoBehaviour
     {
         PickRandomDirection();
         transform.rotation = targetRotation;
+
+        if (animator == null)
+            animator = GetComponentInChildren<Animator>();
+        if (animator == null)
+            Debug.LogWarning(name + " : aucun Animator trouve dans les enfants");
     }
 
     void Update()
     {
-        Wander();
+        SheepBehaviour prey = FindNearestSheep();
+
+        if (prey != null)
+            Chase(prey);
+        else
+            Wander();
+
+        UpdateAnimation(prey != null);
+    }
+
+    // ================= Perception =================
+    // Exercice 1 : trouver le mouton le plus proche dans le rayon de vision
+    private SheepBehaviour FindNearestSheep()
+    {
+        Collider[] hits = Physics.OverlapSphere(transform.position, visionRadius);
+
+        SheepBehaviour nearest = null;
+        float bestDistance = float.MaxValue;
+
+        foreach (Collider hit in hits)
+        {
+            SheepBehaviour sheep = hit.GetComponent<SheepBehaviour>();
+            if (sheep == null)
+                continue;                       // ce collider n'est pas un mouton (herbe, sol...)
+
+            float d = FlatDistanceTo(sheep.transform.position);
+            if (d < bestDistance)
+            {
+                bestDistance = d;
+                nearest = sheep;
+            }
+        }
+        return nearest;
+    }
+
+    private float FlatDistanceTo(Vector3 point)
+    {
+        Vector3 diff = point - transform.position;
+        diff.y = 0f;                            // on ignore la hauteur
+        return diff.magnitude;
+    }
+
+    // ================= Chasse =================
+    // Exercice 2 : chasser le mouton le plus proche
+    private void Chase(SheepBehaviour prey)
+    {
+        LookAt(prey.transform.position);
+        RotateTowardsTarget(chaseTurnSpeed);
+        MoveForward(chaseSpeed);
+    }
+
+    // ================= Animation =================
+    private void UpdateAnimation(bool isChasing)
+    {
+        if (animator == null)
+            return;
+
+        animator.SetBool(IsChasingHash, isChasing);
     }
 
     // ================= Deplacement =================
@@ -30,7 +102,7 @@ public class WolfBehaviour : MonoBehaviour
             PickRandomDirection();
         StayInField();
         RotateTowardsTarget(turnSpeed);
-        MoveForward();
+        MoveForward(speed);
     }
 
     private void PickRandomDirection()
@@ -60,8 +132,15 @@ public class WolfBehaviour : MonoBehaviour
             transform.rotation, targetRotation, degreesPerSecond * Time.deltaTime);
     }
 
-    private void MoveForward()
+    private void MoveForward(float currentSpeed)
     {
-        transform.position += transform.forward * speed * Time.deltaTime;
+        transform.position += transform.forward * currentSpeed * Time.deltaTime;
+    }
+
+    // Dessine le champ de vision dans la vue Scene quand le loup est selectionne
+    void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(transform.position, visionRadius);
     }
 }

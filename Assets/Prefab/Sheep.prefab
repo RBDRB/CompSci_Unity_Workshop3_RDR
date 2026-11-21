@@ -1376,6 +1376,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2708472857668153998}
   - component: {fileID: 5941024743706872881}
+  - component: {fileID: 2420051275845211801}
   m_Layer: 0
   m_Name: Sheep
   m_TagString: Untagged
@@ -1392,7 +1393,7 @@ Transform:
   m_GameObject: {fileID: 3377063216569428020}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0.13, z: 0}
   m_LocalScale: {x: 0.37579533, y: 0.37579533, z: 0.37579533}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1424,8 +1425,30 @@ MonoBehaviour:
   visionRadius: 6
   eatDistance: 1
   eatDuration: 2
+  animator: {fileID: 0}
   state: 0
   energy: 0
+--- !u!65 &2420051275845211801
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3377063216569428020}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 3, y: 4, z: 5}
+  m_Center: {x: 0, y: 2, z: 0.3}
 --- !u!1 &3645874829225136145
 GameObject:
   m_ObjectHideFlags: 0
