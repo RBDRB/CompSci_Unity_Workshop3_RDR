@@ -4,7 +4,7 @@ public class SheepBehaviour : MonoBehaviour
 {
     private enum State { Wandering, SeekingFood, Eating }
 
-    [Header("Déplacement")]
+    [Header("Deplacement")]
     [SerializeField] private float speed = 1.5f;
     [SerializeField] private float turnSpeed = 90f;
     [SerializeField] private float seekTurnSpeed = 270f;   // tourne plus vite quand il vise une herbe
@@ -12,7 +12,7 @@ public class SheepBehaviour : MonoBehaviour
     [SerializeField] private float maxTurnDelay = 9f;
     [SerializeField] private float fieldHalfSize = 20f;
 
-    [Header("Énergie")]
+    [Header("Energie")]
     [SerializeField] private float maxEnergy = 100f;
     [SerializeField] private float energyLossPerSecond = 2f;
     [SerializeField] private float hungerThreshold = 60f;  // en dessous : il a faim
@@ -22,9 +22,15 @@ public class SheepBehaviour : MonoBehaviour
     [SerializeField] private float eatDistance = 1f;
     [SerializeField] private float eatDuration = 2f;
 
+    [Header("Animation")]
+    [SerializeField] private Animator animator;            // l'Animator du modele (enfant)
+
     [Header("Debug (lecture seule)")]
     [SerializeField] private State state = State.Wandering;
     [SerializeField] private float energy;
+
+    // Nom du parametre dans SheepAnimator, converti une seule fois en identifiant
+    private static readonly int IsMovingHash = Animator.StringToHash("IsMoving");
 
     private Quaternion targetRotation;
     private float nextTurnTime;
@@ -36,6 +42,11 @@ public class SheepBehaviour : MonoBehaviour
         energy = maxEnergy;
         PickRandomDirection();
         transform.rotation = targetRotation;
+
+        if (animator == null)
+            animator = GetComponentInChildren<Animator>();
+        if (animator == null)
+            Debug.LogWarning(name + " : aucun Animator trouve dans les enfants");
     }
 
     void Update()
@@ -47,8 +58,9 @@ public class SheepBehaviour : MonoBehaviour
             return;
         }
 
-        UpdateState();   // 1. décider
-        Act();           // 2. agir
+        UpdateState();      // 1. decider
+        Act();              // 2. agir
+        UpdateAnimation();  // 3. montrer
     }
 
     // ================= Transitions =================
@@ -66,7 +78,7 @@ public class SheepBehaviour : MonoBehaviour
                 break;
 
             case State.SeekingFood:
-                if (targetGrass == null)                      // un autre mouton l'a mangée
+                if (targetGrass == null)                      // un autre mouton l'a mangee
                 {
                     state = State.Wandering;
                 }
@@ -110,7 +122,17 @@ public class SheepBehaviour : MonoBehaviour
         }
     }
 
-    // ================= Énergie =================
+    // ================= Animation =================
+    private void UpdateAnimation()
+    {
+        if (animator == null)
+            return;
+
+        bool isMoving = state != State.Eating;
+        animator.SetBool(IsMovingHash, isMoving);
+    }
+
+    // ================= Energie =================
     private bool IsHungry() => energy < hungerThreshold;
 
     private void UpdateEnergy()
@@ -160,7 +182,7 @@ public class SheepBehaviour : MonoBehaviour
         return diff.magnitude;
     }
 
-    // ================= Déplacement =================
+    // ================= Deplacement =================
     private void Wander()
     {
         if (Time.time >= nextTurnTime)
@@ -202,7 +224,7 @@ public class SheepBehaviour : MonoBehaviour
         transform.position += transform.forward * speed * Time.deltaTime;
     }
 
-    // Dessine le champ de vision dans la vue Scene quand le mouton est sélectionné
+    // Dessine le champ de vision dans la vue Scene quand le mouton est selectionne
     void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.green;
