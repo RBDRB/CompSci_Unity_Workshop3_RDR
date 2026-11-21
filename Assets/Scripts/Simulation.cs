@@ -19,6 +19,12 @@ public class Simulation : MonoBehaviour
     [SerializeField] private int maxSheep = 80;                    // au-dela, plus de naissance
     [SerializeField] private int maxWolves = 15;
 
+    [Header("Graphe de population (F2)")]
+    [SerializeField] private PopulationPlot plot;                  // composant pose sur la Main Camera
+    [SerializeField] private float recordInterval = 1f;            // une mesure par seconde
+
+    private float nextRecordTime;
+
     void Start()
     {
         float margin = fieldHalfSize - groupSpawnRadius;           // le groupe entier reste dans le terrain
@@ -28,12 +34,53 @@ public class Simulation : MonoBehaviour
 
         SpawnGroup(sheepPrefab, initialSheep, herdCenter);
         SpawnGroup(wolfPrefab, initialWolves, packCenter);
+
+        if (plot == null)
+            Debug.LogWarning("Simulation : aucun PopulationPlot relie, le graphe F2 restera vide");
+    }
+
+    void Update()
+    {
+        if (plot == null || Time.time < nextRecordTime)
+            return;
+
+        nextRecordTime = Time.time + recordInterval;
+        plot.RecordPopulation(CountLiveSheep(), CountLiveWolves(), CountGrass());
+    }
+
+    // ================= Comptage =================
+    // Les carcasses et les loups en train de mourir ne comptent pas
+    private int CountLiveSheep()
+    {
+        int count = 0;
+        foreach (SheepBehaviour sheep in FindObjectsByType<SheepBehaviour>(FindObjectsSortMode.None))
+        {
+            if (!sheep.IsDead)
+                count++;
+        }
+        return count;
+    }
+
+    private int CountLiveWolves()
+    {
+        int count = 0;
+        foreach (WolfBehaviour wolf in FindObjectsByType<WolfBehaviour>(FindObjectsSortMode.None))
+        {
+            if (!wolf.IsDead)
+                count++;
+        }
+        return count;
+    }
+
+    private int CountGrass()
+    {
+        return FindObjectsByType<Grass>(FindObjectsSortMode.None).Length;
     }
 
     // ================= Naissances (appelees par les parents) =================
     public void SpawnLamb(Vector3 position)
     {
-        if (FindObjectsByType<SheepBehaviour>(FindObjectsSortMode.None).Length >= maxSheep)
+        if (CountLiveSheep() >= maxSheep)
             return;
 
         SheepBehaviour lamb = Instantiate(sheepPrefab, position, Quaternion.identity, transform);
@@ -42,7 +89,7 @@ public class Simulation : MonoBehaviour
 
     public void SpawnCub(Vector3 position)
     {
-        if (FindObjectsByType<WolfBehaviour>(FindObjectsSortMode.None).Length >= maxWolves)
+        if (CountLiveWolves() >= maxWolves)
             return;
 
         WolfBehaviour cub = Instantiate(wolfPrefab, position, Quaternion.identity, transform);
