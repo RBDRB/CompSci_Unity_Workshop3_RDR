@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class WolfBehaviour : MonoBehaviour
@@ -11,6 +12,13 @@ public class WolfBehaviour : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float sharpTurnSpeedFactor = 0.2f; // vitesse gardee pendant un demi-tour
     [SerializeField] private float fieldHalfSize = 20f;
 
+    [Header("Meute (Boids)")]
+    [SerializeField] private float packRadius = 10f;         // distance a laquelle il voit les autres loups
+    [SerializeField] private float personalSpace = 2f;       // en dessous : il s'ecarte
+    [SerializeField] private float cohesionWeight = 1.5f;
+    [SerializeField] private float separationWeight = 2f;
+    [SerializeField] private float alignmentWeight = 0.5f;
+
     [Header("Chasse")]
     [SerializeField] private float visionRadius = 10f;
     [SerializeField] private float chaseSpeed = 4f;
@@ -22,13 +30,19 @@ public class WolfBehaviour : MonoBehaviour
 
     private static readonly int IsChasingHash = Animator.StringToHash("IsChasing");
 
-    private Quaternion targetRotation;
+    // Remplis a chaque image par ScanSurroundings()
+    private readonly List<WolfBehaviour> packMates = new List<WolfBehaviour>();
+    private SheepBehaviour prey;
+
+    private float wanderHeading;                             // cap souhaite en rodant, en degres
     private float nextTurnTime;
+    private Quaternion targetRotation;
 
     void Start()
     {
         transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);  // cap de depart au hasard
-        PickRandomDirection();
+        wanderHeading = transform.eulerAngles.y;
+        nextTurnTime = Time.time + Random.Range(minTurnDelay, maxTurnDelay);
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -38,10 +52,10 @@ public class WolfBehaviour : MonoBehaviour
 
     void Update()
     {
-        SheepBehaviour prey = FindNearestSheep();
+        ScanSurroundings();
 
         if (prey != null)
-            Chase(prey);
+            Chase();
         else
             Wander();
 
@@ -49,28 +63,35 @@ public class WolfBehaviour : MonoBehaviour
     }
 
     // ================= Perception =================
-    // Exercice 1 : trouver le mouton le plus proche dans le rayon de vision
-    private SheepBehaviour FindNearestSheep()
+    // Un seul balayage : les loups de la meute + le mouton le plus proche (exercice 1)
+    private void ScanSurroundings()
     {
-        Collider[] hits = Physics.OverlapSphere(transform.position, visionRadius);
-
-        SheepBehaviour nearest = null;
+        packMates.Clear();
+        prey = null;
         float bestDistance = float.MaxValue;
+
+        float radius = Mathf.Max(packRadius, visionRadius);
+        Collider[] hits = Physics.OverlapSphere(transform.position, radius);
 
         foreach (Collider hit in hits)
         {
-            SheepBehaviour sheep = hit.GetComponent<SheepBehaviour>();
-            if (sheep == null)
-                continue;                       // ce collider n'est pas un mouton
+            float d = FlatDistanceTo(hit.transform.position);
 
-            float d = FlatDistanceTo(sheep.transform.position);
-            if (d < bestDistance)
+            SheepBehaviour sheep = hit.GetComponent<SheepBehaviour>();
+            if (sheep != null)
             {
-                bestDistance = d;
-                nearest = sheep;
+                if (d <= visionRadius && d < bestDistance)
+                {
+                    bestDistance = d;
+                    prey = sheep;
+                }
+                continue;
             }
+
+            WolfBehaviour wolf = hit.GetComponent<WolfBehaviour>();
+            if (wolf != null && wolf != this && d <= packRadius)
+                packMates.Add(wolf);
         }
-        return nearest;
     }
 
     private float FlatDistanceTo(Vector3 point)
@@ -82,13 +103,63 @@ public class WolfBehaviour : MonoBehaviour
 
     // ================= Chasse =================
     // Exercice 2 : chasser le mouton le plus proche
-    private void Chase(SheepBehaviour prey)
+    private void Chase()
     {
-        LookAt(prey.transform.position);
-        RotateTowardsTarget(chaseTurnSpeed);
+        SteerTowards(prey.transform.position - transform.position, chaseTurnSpeed);
 
         if (FlatDistanceTo(prey.transform.position) > catchDistance)
             MoveForward(chaseSpeed);
+
+        wanderHeading = transform.eulerAngles.y;    // apres la chasse, il repart tout droit
+    }
+
+    // ================= Errance en meute =================
+    private void Wander()
+    {
+        if (Time.time >= nextTurnTime)
+        {
+            wanderHeading += Random.Range(-maxWanderAngle, maxWanderAngle);
+            nextTurnTime = Time.time + Random.Range(minTurnDelay, maxTurnDelay);
+        }
+
+        Vector3 wanderDirection = Quaternion.Euler(0f, wanderHeading, 0f) * Vector3.forward;
+        SteerTowards(wanderDirection + PackDirection(), turnSpeed);
+        MoveForward(speed);
+    }
+
+    // Les 3 regles des Boids : cohesion, separation, alignement
+    private Vector3 PackDirection()
+    {
+        if (packMates.Count == 0)
+            return Vector3.zero;
+
+        Vector3 center = Vector3.zero;
+        Vector3 separation = Vector3.zero;
+        Vector3 alignment = Vector3.zero;
+
+        foreach (WolfBehaviour other in packMates)
+        {
+            center += other.transform.position;
+            alignment += other.transform.forward;
+
+            Vector3 away = transform.position - other.transform.position;
+            away.y = 0f;
+            float d = away.magnitude;
+            if (d > 0.001f && d < personalSpace)
+                separation += away / d * (1f - d / personalSpace);
+        }
+
+        center /= packMates.Count;
+        Vector3 toCenter = center - transform.position;
+        toCenter.y = 0f;
+        Vector3 cohesion = toCenter / packRadius;
+
+        alignment.y = 0f;
+        alignment = alignment.normalized;
+
+        return cohesion * cohesionWeight
+             + separation * separationWeight
+             + alignment * alignmentWeight;
     }
 
     // ================= Animation =================
@@ -100,46 +171,29 @@ public class WolfBehaviour : MonoBehaviour
         animator.SetBool(IsChasingHash, isChasing);
     }
 
-    // ================= Deplacement =================
-    private void Wander()
+    // ================= Mouvement de base =================
+    private void SteerTowards(Vector3 desiredDirection, float degreesPerSecond)
     {
-        if (Time.time >= nextTurnTime)
-            PickRandomDirection();
-        StayInField();
-        RotateTowardsTarget(turnSpeed);
-        MoveForward(speed);
-    }
+        desiredDirection = KeepInsideField(desiredDirection);
+        desiredDirection.y = 0f;
+        if (desiredDirection.sqrMagnitude > 0.001f)
+            targetRotation = Quaternion.LookRotation(desiredDirection);
 
-    // Nouveau cap proche du cap actuel : le loup rode au lieu de faire demi-tour
-    private void PickRandomDirection()
-    {
-        float newHeading = transform.eulerAngles.y + Random.Range(-maxWanderAngle, maxWanderAngle);
-        targetRotation = Quaternion.Euler(0f, newHeading, 0f);
-        nextTurnTime = Time.time + Random.Range(minTurnDelay, maxTurnDelay);
-    }
-
-    private void StayInField()
-    {
-        Vector3 p = transform.position;
-        if (Mathf.Abs(p.x) > fieldHalfSize || Mathf.Abs(p.z) > fieldHalfSize)
-            LookAt(Vector3.zero);
-    }
-
-    private void LookAt(Vector3 point)
-    {
-        Vector3 direction = point - transform.position;
-        direction.y = 0f;
-        if (direction.sqrMagnitude > 0.001f)
-            targetRotation = Quaternion.LookRotation(direction);
-    }
-
-    private void RotateTowardsTarget(float degreesPerSecond)
-    {
         transform.rotation = Quaternion.RotateTowards(
             transform.rotation, targetRotation, degreesPerSecond * Time.deltaTime);
     }
 
-    // Avance, en ralentissant quand il reste un grand angle a tourner
+    private Vector3 KeepInsideField(Vector3 desiredDirection)
+    {
+        Vector3 p = transform.position;
+        if (Mathf.Abs(p.x) <= fieldHalfSize && Mathf.Abs(p.z) <= fieldHalfSize)
+            return desiredDirection;
+
+        Vector3 toCenter = new Vector3(-p.x, 0f, -p.z);
+        wanderHeading = Quaternion.LookRotation(toCenter).eulerAngles.y;
+        return toCenter;
+    }
+
     private void MoveForward(float currentSpeed)
     {
         float angleLeft = Quaternion.Angle(transform.rotation, targetRotation);   // 0 a 180 degres
@@ -147,10 +201,11 @@ public class WolfBehaviour : MonoBehaviour
         transform.position += transform.forward * currentSpeed * speedFactor * Time.deltaTime;
     }
 
-    // Dessine le champ de vision dans la vue Scene quand le loup est selectionne
     void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, visionRadius);
+        Gizmos.DrawWireSphere(transform.position, visionRadius);   // moutons
+        Gizmos.color = Color.magenta;
+        Gizmos.DrawWireSphere(transform.position, packRadius);     // meute
     }
 }

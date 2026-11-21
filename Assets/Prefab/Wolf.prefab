@@ -52,8 +52,13 @@ MonoBehaviour:
   maxWanderAngle: 60
   sharpTurnSpeedFactor: 0.2
   fieldHalfSize: 20
+  packRadius: 10
+  personalSpace: 3
+  cohesionWeight: 1.5
+  separationWeight: 3
+  alignmentWeight: 0.5
   visionRadius: 10
-  chaseSpeed: 4
+  chaseSpeed: 3
   chaseTurnSpeed: 270
   catchDistance: 1
   animator: {fileID: 0}
