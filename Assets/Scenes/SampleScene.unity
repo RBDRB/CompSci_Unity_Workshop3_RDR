@@ -427,74 +427,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PopulationPlot
   windowSeconds: 240
   visible: 0
---- !u!1001 &1102772014
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 1848277957472483125, guid: 00128a125f7b9084f9edbe290d5c0ee9, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: -5.8954268
-      objectReference: {fileID: 0}
-    - target: {fileID: 1848277957472483125, guid: 00128a125f7b9084f9edbe290d5c0ee9, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: -0.00000013480275
-      objectReference: {fileID: 0}
-    - target: {fileID: 1848277957472483125, guid: 00128a125f7b9084f9edbe290d5c0ee9, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -3.6996362
-      objectReference: {fileID: 0}
-    - target: {fileID: 1848277957472483125, guid: 00128a125f7b9084f9edbe290d5c0ee9, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1848277957472483125, guid: 00128a125f7b9084f9edbe290d5c0ee9, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1848277957472483125, guid: 00128a125f7b9084f9edbe290d5c0ee9, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1848277957472483125, guid: 00128a125f7b9084f9edbe290d5c0ee9, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1848277957472483125, guid: 00128a125f7b9084f9edbe290d5c0ee9, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1848277957472483125, guid: 00128a125f7b9084f9edbe290d5c0ee9, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1848277957472483125, guid: 00128a125f7b9084f9edbe290d5c0ee9, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8197700822136367254, guid: 00128a125f7b9084f9edbe290d5c0ee9, type: 3}
-      propertyPath: m_Name
-      value: Grass
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 00128a125f7b9084f9edbe290d5c0ee9, type: 3}
---- !u!114 &1102772015 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 958382530065299478, guid: 00128a125f7b9084f9edbe290d5c0ee9, type: 3}
-  m_PrefabInstance: {fileID: 1102772014}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bc8b16540fc0b6a4587e89ad6db792fd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Grass
 --- !u!1 &1509686287
 GameObject:
   m_ObjectHideFlags: 0
@@ -524,7 +456,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5a96609fdeca42c4daa71c24a5fe8a38, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GrassSpawner
-  grassPrefab: {fileID: 1102772015}
+  grassPrefab: {fileID: 958382530065299478, guid: 00128a125f7b9084f9edbe290d5c0ee9, type: 3}
   initialCount: 80
   maxCount: 200
   regrowInterval: 1
@@ -603,9 +535,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Simulation
   sheepPrefab: {fileID: 5941024743706872881, guid: 6aaaf88f7e60dc54a9a0fd0560ba4d96, type: 3}
   wolfPrefab: {fileID: 8317351119023202228, guid: 17c4998355e458148bb6e53ada550d6e, type: 3}
-  initialSheep: 20
-  initialWolves: 3
+  initialSheep: 10
+  initialWolves: 2
   fieldHalfSize: 20
+  groupSpawnRadius: 5
+  minDistanceBetweenGroups: 25
+  maxSheep: 80
+  maxWolves: 15
+  plot: {fileID: 808417617}
+  recordInterval: 1
 --- !u!1 &1839410968
 GameObject:
   m_ObjectHideFlags: 0
@@ -725,6 +663,5 @@ SceneRoots:
   - {fileID: 330585546}
   - {fileID: 410087041}
   - {fileID: 1839410972}
-  - {fileID: 1102772014}
   - {fileID: 1509686289}
   - {fileID: 1565006191}
