@@ -3,6 +3,8 @@ using UnityEngine;
 
 public class WolfBehaviour : MonoBehaviour
 {
+    private enum State { Wandering, Chasing, Attacking, Eating, Dead }
+
     [Header("Deplacement")]
     [SerializeField] private float speed = 2f;
     [SerializeField] private float turnSpeed = 90f;
@@ -12,6 +14,9 @@ public class WolfBehaviour : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float sharpTurnSpeedFactor = 0.2f; // vitesse gardee pendant un demi-tour
     [SerializeField] private float fieldHalfSize = 20f;
 
+    [Header("Corps")]
+    [SerializeField] private float bodyRadius = 0.6f;        // deux animaux restent a la somme de leurs rayons
+
     [Header("Meute (Boids)")]
     [SerializeField] private float packRadius = 10f;         // distance a laquelle il voit les autres loups
     [SerializeField] private float personalSpace = 2f;       // en dessous : il s'ecarte
@@ -20,19 +25,48 @@ public class WolfBehaviour : MonoBehaviour
     [SerializeField] private float alignmentWeight = 0.5f;
 
     [Header("Chasse")]
-    [SerializeField] private float visionRadius = 10f;
-    [SerializeField] private float chaseSpeed = 4f;
+    [SerializeField] private float visionRadius = 7f;
+    [SerializeField] private float chaseSpeed = 4.5f;
     [SerializeField] private float chaseTurnSpeed = 270f;
-    [SerializeField] private float catchDistance = 1f;       // au contact : il s'arrete
+    [SerializeField] private float catchDistance = 1.3f;     // doit rester > somme des rayons des corps
+
+    [Header("Energie")]
+    [SerializeField] private float maxEnergy = 100f;
+    [SerializeField] private float energyLossPerSecond = 1.5f;
+    [SerializeField] private float hungerThreshold = 70f;    // en dessous : il chasse
+
+    [Header("Repas")]
+    [SerializeField] private float biteSize = 20f;           // viande arrachee a chaque cycle de l'animation Eating
 
     [Header("Animation")]
     [SerializeField] private Animator animator;              // l'Animator du modele (enfant)
 
+    [Header("Debug (lecture seule)")]
+    [SerializeField] private State state = State.Wandering;
+    [SerializeField] private float energy;
+
+    // Noms des parametres de WolfAnimator
     private static readonly int IsChasingHash = Animator.StringToHash("IsChasing");
+    private static readonly int IsEatingHash = Animator.StringToHash("IsEating");
+    private static readonly int AttackHash = Animator.StringToHash("Attack");
+    private static readonly int DieHash = Animator.StringToHash("Die");
+
+    // Lus par les moutons et les autres loups
+    public bool IsDead => state == State.Dead;
+    public float BodyRadius => bodyRadius;
 
     // Remplis a chaque image par ScanSurroundings()
     private readonly List<WolfBehaviour> packMates = new List<WolfBehaviour>();
-    private SheepBehaviour prey;
+    private readonly List<SheepBehaviour> nearbyLiveSheep = new List<SheepBehaviour>();
+    private SheepBehaviour nearestLiveSheep;
+    private SheepBehaviour nearestCarcass;
+
+    private SheepBehaviour target;                           // le mouton chasse ou la carcasse mangee
+    private float attackDuration;                            // durees lues dans les clips d'animation
+    private float biteDuration;
+    private float deathDuration;
+    private float attackEndTime;
+    private float nextBiteTime;
 
     private float wanderHeading;                             // cap souhaite en rodant, en degres
     private float nextTurnTime;
@@ -40,35 +74,49 @@ public class WolfBehaviour : MonoBehaviour
 
     void Start()
     {
+        energy = maxEnergy;
         transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);  // cap de depart au hasard
-        wanderHeading = transform.eulerAngles.y;
-        nextTurnTime = Time.time + Random.Range(minTurnDelay, maxTurnDelay);
+        StartWandering();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
         if (animator == null)
             Debug.LogWarning(name + " : aucun Animator trouve dans les enfants");
+
+        attackDuration = ClipLength("Attack", 1.3f);
+        biteDuration = ClipLength("Eating", 2.5f);   // une bouchee = un cycle de l'animation
+        deathDuration = ClipLength("Death", 1f);
     }
 
     void Update()
     {
-        ScanSurroundings();
+        if (state == State.Dead)
+            return;
 
-        if (prey != null)
-            Chase();
-        else
-            Wander();
+        UpdateEnergy();
+        if (energy <= 0f)
+        {
+            Die();
+            return;
+        }
 
-        UpdateAnimation(prey != null);
+        ScanSurroundings(); // 1. percevoir
+        UpdateState();      // 2. decider
+        Act();              // 3. agir
+        ResolveOverlaps();  // 4. ne pas traverser les autres
+        UpdateAnimation();  // 5. montrer
     }
 
     // ================= Perception =================
-    // Un seul balayage : les loups de la meute + le mouton le plus proche (exercice 1)
+    // Un seul balayage : la meute, les moutons vivants (le plus proche = exercice 1) et les carcasses
     private void ScanSurroundings()
     {
         packMates.Clear();
-        prey = null;
-        float bestDistance = float.MaxValue;
+        nearbyLiveSheep.Clear();
+        nearestLiveSheep = null;
+        nearestCarcass = null;
+        float bestLive = float.MaxValue;
+        float bestCarcass = float.MaxValue;
 
         float radius = Mathf.Max(packRadius, visionRadius);
         Collider[] hits = Physics.OverlapSphere(transform.position, radius);
@@ -80,16 +128,28 @@ public class WolfBehaviour : MonoBehaviour
             SheepBehaviour sheep = hit.GetComponent<SheepBehaviour>();
             if (sheep != null)
             {
-                if (d <= visionRadius && d < bestDistance)
+                if (sheep.IsDead)
                 {
-                    bestDistance = d;
-                    prey = sheep;
+                    if (sheep.HasMeat && d <= visionRadius && d < bestCarcass)
+                    {
+                        bestCarcass = d;
+                        nearestCarcass = sheep;
+                    }
+                }
+                else
+                {
+                    nearbyLiveSheep.Add(sheep);
+                    if (d <= visionRadius && d < bestLive)
+                    {
+                        bestLive = d;
+                        nearestLiveSheep = sheep;
+                    }
                 }
                 continue;
             }
 
             WolfBehaviour wolf = hit.GetComponent<WolfBehaviour>();
-            if (wolf != null && wolf != this && d <= packRadius)
+            if (wolf != null && wolf != this && !wolf.IsDead && d <= packRadius)
                 packMates.Add(wolf);
         }
     }
@@ -101,19 +161,105 @@ public class WolfBehaviour : MonoBehaviour
         return diff.magnitude;
     }
 
-    // ================= Chasse =================
-    // Exercice 2 : chasser le mouton le plus proche
-    private void Chase()
+    // ================= Transitions (machine a etats des slides) =================
+    private void UpdateState()
     {
-        SteerTowards(prey.transform.position - transform.position, chaseTurnSpeed);
+        switch (state)
+        {
+            case State.Wandering:
+                // Affame et nourriture visible -> Chasing ; une carcasse passe avant un mouton vivant
+                if (IsHungry())
+                {
+                    target = nearestCarcass != null ? nearestCarcass : nearestLiveSheep;
+                    if (target != null)
+                        state = State.Chasing;
+                }
+                break;
 
-        if (FlatDistanceTo(prey.transform.position) > catchDistance)
-            MoveForward(chaseSpeed);
+            case State.Chasing:
+                // Cible disparue ou partie trop loin -> abandon
+                if (target == null || FlatDistanceTo(target.transform.position) > visionRadius * 1.5f)
+                {
+                    StartWandering();
+                }
+                else if (FlatDistanceTo(target.transform.position) <= catchDistance)
+                {
+                    if (target.IsDead)
+                    {
+                        StartEating();                  // deja mort : on mange directement
+                    }
+                    else
+                    {
+                        target.Die("tue par un loup");  // exercice 2 : la capture
+                        state = State.Attacking;
+                        attackEndTime = Time.time + attackDuration;
+                        if (animator != null)
+                            animator.SetTrigger(AttackHash);
+                    }
+                }
+                break;
 
-        wanderHeading = transform.eulerAngles.y;    // apres la chasse, il repart tout droit
+            case State.Attacking:
+                if (Time.time >= attackEndTime)
+                    StartEating();
+                break;
+
+            case State.Eating:
+                if (target == null)                     // un autre loup a fini la carcasse
+                {
+                    StartWandering();
+                    break;
+                }
+
+                if (Time.time >= nextBiteTime)          // un cycle d'animation Eating = une bouchee
+                {
+                    GainEnergy(target.TakeBite(biteSize));
+                    nextBiteTime += biteDuration;
+
+                    if (!target.HasMeat || energy >= maxEnergy)
+                        StartWandering();               // carcasse vide ou loup rassasie
+                }
+                break;
+        }
     }
 
-    // ================= Errance en meute =================
+    private void StartWandering()
+    {
+        state = State.Wandering;
+        target = null;
+        wanderHeading = transform.eulerAngles.y;    // repart dans la direction ou il regarde
+        nextTurnTime = Time.time + Random.Range(minTurnDelay, maxTurnDelay);
+    }
+
+    private void StartEating()
+    {
+        state = State.Eating;
+        nextBiteTime = Time.time + biteDuration;
+    }
+
+    // ================= Actions =================
+    private void Act()
+    {
+        switch (state)
+        {
+            case State.Wandering:
+                Wander();
+                break;
+
+            case State.Chasing:
+                SteerTowards(target.transform.position - transform.position, chaseTurnSpeed);
+                if (FlatDistanceTo(target.transform.position) > catchDistance)
+                    MoveForward(chaseSpeed);
+                break;
+
+            case State.Attacking:
+            case State.Eating:
+                if (target != null)                     // reste face a sa proie, sans avancer
+                    SteerTowards(target.transform.position - transform.position, chaseTurnSpeed);
+                break;
+        }
+    }
+
     private void Wander()
     {
         if (Time.time >= nextTurnTime)
@@ -162,13 +308,80 @@ public class WolfBehaviour : MonoBehaviour
              + alignment * alignmentWeight;
     }
 
+    // ================= Collisions douces =================
+    private void ResolveOverlaps()
+    {
+        foreach (WolfBehaviour other in packMates)
+            PushAwayFrom(other.transform.position, bodyRadius + other.BodyRadius);
+
+        foreach (SheepBehaviour sheep in nearbyLiveSheep)
+            PushAwayFrom(sheep.transform.position, bodyRadius + sheep.BodyRadius);
+    }
+
+    private void PushAwayFrom(Vector3 otherPosition, float minDistance)
+    {
+        Vector3 away = transform.position - otherPosition;
+        away.y = 0f;
+        float d = away.magnitude;
+        if (d >= minDistance || d < 0.0001f)
+            return;
+
+        transform.position += away / d * ((minDistance - d) * 0.5f);
+    }
+
+    // ================= Energie et mort =================
+    private bool IsHungry() => energy < hungerThreshold;
+
+    private void UpdateEnergy()
+    {
+        energy -= energyLossPerSecond * Time.deltaTime;
+    }
+
+    private void GainEnergy(float amount)
+    {
+        energy = Mathf.Min(energy + amount, maxEnergy);
+    }
+
+    private void Die()
+    {
+        Debug.Log(name + " est mort de faim");
+        state = State.Dead;
+        target = null;
+
+        if (animator != null)
+        {
+            animator.SetBool(IsChasingHash, false);
+            animator.SetBool(IsEatingHash, false);
+            animator.SetTrigger(DieHash);
+        }
+
+        Destroy(gameObject, deathDuration + 2f);    // laisse le temps de voir l'animation
+    }
+
     // ================= Animation =================
-    private void UpdateAnimation(bool isChasing)
+    private void UpdateAnimation()
     {
         if (animator == null)
             return;
 
-        animator.SetBool(IsChasingHash, isChasing);
+        animator.SetBool(IsChasingHash, state == State.Chasing);
+        animator.SetBool(IsEatingHash, state == State.Attacking || state == State.Eating);
+    }
+
+    // Duree d'un clip de WolfAnimator, pour caler le code sur l'animation
+    private float ClipLength(string clipName, float fallback)
+    {
+        if (animator == null || animator.runtimeAnimatorController == null)
+            return fallback;
+
+        foreach (AnimationClip clip in animator.runtimeAnimatorController.animationClips)
+        {
+            if (clip.name == clipName)
+                return clip.length;
+        }
+
+        Debug.LogWarning(name + " : clip '" + clipName + "' absent de WolfAnimator, duree par defaut utilisee");
+        return fallback;
     }
 
     // ================= Mouvement de base =================
