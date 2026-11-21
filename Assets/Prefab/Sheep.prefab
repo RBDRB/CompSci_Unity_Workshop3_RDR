@@ -1413,18 +1413,34 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2b889edc46b8a1d44b9018d70e147f68, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SheepBehavior
-  speed: 1.5
+  speed: 1
   turnSpeed: 90
   seekTurnSpeed: 270
   minTurnDelay: 5
   maxTurnDelay: 9
+  maxWanderAngle: 60
+  sharpTurnSpeedFactor: 0.2
   fieldHalfSize: 20
+  bodyRadius: 0.5
+  herdRadius: 8
+  personalSpace: 1
+  cohesionWeight: 1.5
+  separationWeight: 1
+  alignmentWeight: 0.5
+  wolfDetectionRadius: 8
+  fleeSpeed: 3.5
+  fleeTurnSpeed: 360
   maxEnergy: 100
   energyLossPerSecond: 2
   hungerThreshold: 60
   visionRadius: 6
   eatDistance: 1
   eatDuration: 2
+  meat: 100
+  corpseLifetime: 30
+  fallDuration: 0.5
+  deadRoll: 180
+  deadHeightOffset: 0.8
   animator: {fileID: 0}
   state: 0
   energy: 0

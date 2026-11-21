@@ -52,16 +52,23 @@ MonoBehaviour:
   maxWanderAngle: 60
   sharpTurnSpeedFactor: 0.2
   fieldHalfSize: 20
+  bodyRadius: 0.6
   packRadius: 10
   personalSpace: 3
   cohesionWeight: 1.5
   separationWeight: 3
   alignmentWeight: 0.5
   visionRadius: 10
-  chaseSpeed: 3
+  chaseSpeed: 4
   chaseTurnSpeed: 270
   catchDistance: 1
+  maxEnergy: 100
+  energyLossPerSecond: 3
+  hungerThreshold: 60
+  biteSize: 15
   animator: {fileID: 0}
+  state: 0
+  energy: 0
 --- !u!1001 &3638014521867167784
 PrefabInstance:
   m_ObjectHideFlags: 0
