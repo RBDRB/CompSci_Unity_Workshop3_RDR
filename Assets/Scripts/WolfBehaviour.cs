@@ -7,15 +7,18 @@ public class WolfBehaviour : MonoBehaviour
     [SerializeField] private float turnSpeed = 90f;
     [SerializeField] private float minTurnDelay = 5f;
     [SerializeField] private float maxTurnDelay = 9f;
+    [SerializeField] private float maxWanderAngle = 60f;     // ecart maximal du nouveau cap
+    [SerializeField, Range(0f, 1f)] private float sharpTurnSpeedFactor = 0.2f; // vitesse gardee pendant un demi-tour
     [SerializeField] private float fieldHalfSize = 20f;
 
     [Header("Chasse")]
     [SerializeField] private float visionRadius = 10f;
     [SerializeField] private float chaseSpeed = 4f;
     [SerializeField] private float chaseTurnSpeed = 270f;
+    [SerializeField] private float catchDistance = 1f;       // au contact : il s'arrete
 
     [Header("Animation")]
-    [SerializeField] private Animator animator;            // l'Animator du modele (enfant)
+    [SerializeField] private Animator animator;              // l'Animator du modele (enfant)
 
     private static readonly int IsChasingHash = Animator.StringToHash("IsChasing");
 
@@ -24,8 +27,8 @@ public class WolfBehaviour : MonoBehaviour
 
     void Start()
     {
+        transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);  // cap de depart au hasard
         PickRandomDirection();
-        transform.rotation = targetRotation;
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -58,7 +61,7 @@ public class WolfBehaviour : MonoBehaviour
         {
             SheepBehaviour sheep = hit.GetComponent<SheepBehaviour>();
             if (sheep == null)
-                continue;                       // ce collider n'est pas un mouton (herbe, sol...)
+                continue;                       // ce collider n'est pas un mouton
 
             float d = FlatDistanceTo(sheep.transform.position);
             if (d < bestDistance)
@@ -83,7 +86,9 @@ public class WolfBehaviour : MonoBehaviour
     {
         LookAt(prey.transform.position);
         RotateTowardsTarget(chaseTurnSpeed);
-        MoveForward(chaseSpeed);
+
+        if (FlatDistanceTo(prey.transform.position) > catchDistance)
+            MoveForward(chaseSpeed);
     }
 
     // ================= Animation =================
@@ -105,9 +110,11 @@ public class WolfBehaviour : MonoBehaviour
         MoveForward(speed);
     }
 
+    // Nouveau cap proche du cap actuel : le loup rode au lieu de faire demi-tour
     private void PickRandomDirection()
     {
-        targetRotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+        float newHeading = transform.eulerAngles.y + Random.Range(-maxWanderAngle, maxWanderAngle);
+        targetRotation = Quaternion.Euler(0f, newHeading, 0f);
         nextTurnTime = Time.time + Random.Range(minTurnDelay, maxTurnDelay);
     }
 
@@ -132,9 +139,12 @@ public class WolfBehaviour : MonoBehaviour
             transform.rotation, targetRotation, degreesPerSecond * Time.deltaTime);
     }
 
+    // Avance, en ralentissant quand il reste un grand angle a tourner
     private void MoveForward(float currentSpeed)
     {
-        transform.position += transform.forward * currentSpeed * Time.deltaTime;
+        float angleLeft = Quaternion.Angle(transform.rotation, targetRotation);   // 0 a 180 degres
+        float speedFactor = Mathf.Lerp(1f, sharpTurnSpeedFactor, angleLeft / 180f);
+        transform.position += transform.forward * currentSpeed * speedFactor * Time.deltaTime;
     }
 
     // Dessine le champ de vision dans la vue Scene quand le loup est selectionne

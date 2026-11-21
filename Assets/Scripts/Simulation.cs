@@ -7,8 +7,8 @@ public class Simulation : MonoBehaviour
     [SerializeField] private WolfBehaviour wolfPrefab;
 
     [Header("Population initiale")]
-    [SerializeField] private int initialSheep = 20;
-    [SerializeField] private int initialWolves = 3;
+    [SerializeField] private int initialSheep = 10;
+    [SerializeField] private int initialWolves = 2;
     [SerializeField] private float fieldHalfSize = 20f;
 
     void Start()

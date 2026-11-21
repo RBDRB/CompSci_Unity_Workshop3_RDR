@@ -7,15 +7,17 @@ public class SheepBehaviour : MonoBehaviour
     [Header("Deplacement")]
     [SerializeField] private float speed = 1.5f;
     [SerializeField] private float turnSpeed = 90f;
-    [SerializeField] private float seekTurnSpeed = 270f;   // tourne plus vite quand il vise une herbe
+    [SerializeField] private float seekTurnSpeed = 270f;     // tourne plus vite quand il vise une herbe
     [SerializeField] private float minTurnDelay = 5f;
     [SerializeField] private float maxTurnDelay = 9f;
+    [SerializeField] private float maxWanderAngle = 60f;     // ecart maximal du nouveau cap
+    [SerializeField, Range(0f, 1f)] private float sharpTurnSpeedFactor = 0.2f; // vitesse gardee pendant un demi-tour
     [SerializeField] private float fieldHalfSize = 20f;
 
     [Header("Energie")]
     [SerializeField] private float maxEnergy = 100f;
     [SerializeField] private float energyLossPerSecond = 2f;
-    [SerializeField] private float hungerThreshold = 60f;  // en dessous : il a faim
+    [SerializeField] private float hungerThreshold = 60f;    // en dessous : il a faim
 
     [Header("Nourriture")]
     [SerializeField] private float visionRadius = 6f;
@@ -23,13 +25,12 @@ public class SheepBehaviour : MonoBehaviour
     [SerializeField] private float eatDuration = 2f;
 
     [Header("Animation")]
-    [SerializeField] private Animator animator;            // l'Animator du modele (enfant)
+    [SerializeField] private Animator animator;              // l'Animator du modele (enfant)
 
     [Header("Debug (lecture seule)")]
     [SerializeField] private State state = State.Wandering;
     [SerializeField] private float energy;
 
-    // Nom du parametre dans SheepAnimator, converti une seule fois en identifiant
     private static readonly int IsMovingHash = Animator.StringToHash("IsMoving");
 
     private Quaternion targetRotation;
@@ -40,8 +41,8 @@ public class SheepBehaviour : MonoBehaviour
     void Start()
     {
         energy = maxEnergy;
+        transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);  // cap de depart au hasard
         PickRandomDirection();
-        transform.rotation = targetRotation;
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -163,7 +164,7 @@ public class SheepBehaviour : MonoBehaviour
         {
             Grass grass = hit.GetComponent<Grass>();
             if (grass == null || grass.IsEaten)
-                continue;                       // ce collider n'est pas de l'herbe (le sol, par ex.)
+                continue;                       // ce collider n'est pas de l'herbe
 
             float d = FlatDistanceTo(grass.transform.position);
             if (d < bestDistance)
@@ -192,9 +193,11 @@ public class SheepBehaviour : MonoBehaviour
         MoveForward();
     }
 
+    // Nouveau cap proche du cap actuel : le mouton flane au lieu de faire demi-tour
     private void PickRandomDirection()
     {
-        targetRotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+        float newHeading = transform.eulerAngles.y + Random.Range(-maxWanderAngle, maxWanderAngle);
+        targetRotation = Quaternion.Euler(0f, newHeading, 0f);
         nextTurnTime = Time.time + Random.Range(minTurnDelay, maxTurnDelay);
     }
 
@@ -219,9 +222,12 @@ public class SheepBehaviour : MonoBehaviour
             transform.rotation, targetRotation, degreesPerSecond * Time.deltaTime);
     }
 
+    // Avance, en ralentissant quand il reste un grand angle a tourner
     private void MoveForward()
     {
-        transform.position += transform.forward * speed * Time.deltaTime;
+        float angleLeft = Quaternion.Angle(transform.rotation, targetRotation);   // 0 a 180 degres
+        float speedFactor = Mathf.Lerp(1f, sharpTurnSpeedFactor, angleLeft / 180f);
+        transform.position += transform.forward * speed * speedFactor * Time.deltaTime;
     }
 
     // Dessine le champ de vision dans la vue Scene quand le mouton est selectionne

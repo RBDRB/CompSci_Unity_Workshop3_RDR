@@ -756,7 +756,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.376, y: 0.376, z: 0.376}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 8879528566716807029}
@@ -1393,8 +1393,8 @@ Transform:
   m_GameObject: {fileID: 3377063216569428020}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.13, z: 0}
-  m_LocalScale: {x: 0.37579533, y: 0.37579533, z: 0.37579533}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 6424025208750023184}
@@ -1414,7 +1414,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SheepBehavior
   speed: 1.5
-  turnSpeed: 30
+  turnSpeed: 90
   seekTurnSpeed: 270
   minTurnDelay: 5
   maxTurnDelay: 9
@@ -1447,8 +1447,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 3, y: 4, z: 5}
-  m_Center: {x: 0, y: 2, z: 0.3}
+  m_Size: {x: 0.9, y: 1.6, z: 2}
+  m_Center: {x: 0, y: 0.8, z: 0.2}
 --- !u!1 &3645874829225136145
 GameObject:
   m_ObjectHideFlags: 0
