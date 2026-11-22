@@ -28,7 +28,9 @@ public class WolfBehaviour : MonoBehaviour
     [SerializeField] private float visionRadius = 7f;
     [SerializeField] private float chaseSpeed = 4.5f;
     [SerializeField] private float chaseTurnSpeed = 270f;
-    [SerializeField] private float catchDistance = 1.3f;     // doit rester > somme des rayons des corps
+    [SerializeField] private float catchReach = 0.3f;        // portee de l'attaque au-dela du contact des corps
+    [SerializeField] private float maxChaseDuration = 12f;   // au-dela, il abandonne (essouffle)
+    [SerializeField] private float restAfterFailedChase = 4f; // repos avant de pouvoir rechasser
 
     [Header("Energie")]
     [SerializeField] private float maxEnergy = 100f;
@@ -84,6 +86,8 @@ public class WolfBehaviour : MonoBehaviour
     private bool isNewborn;
 
     private SheepBehaviour target;                           // le mouton chasse ou la carcasse mangee
+    private float chaseEndTime;                              // limite de la chasse en cours
+    private float nextHuntTime;                              // fin du repos apres une chasse ratee
     private float attackDuration;                            // durees lues dans les clips d'animation
     private float biteDuration;
     private float deathDuration;
@@ -203,6 +207,13 @@ public class WolfBehaviour : MonoBehaviour
         return diff.magnitude;
     }
 
+    // Assez pres pour mordre : contact des deux corps + portee de l'attaque
+    private bool IsInReach(SheepBehaviour sheep)
+    {
+        float reach = BodyRadius + sheep.BodyRadius + catchReach;
+        return FlatDistanceTo(sheep.transform.position) <= reach;
+    }
+
     // ================= Transitions (machine a etats des slides) =================
     private void UpdateState()
     {
@@ -210,25 +221,30 @@ public class WolfBehaviour : MonoBehaviour
         {
             case State.Wandering:
                 // Priorite : manger avant de se reproduire ; une carcasse passe avant un mouton vivant
-                if (IsHungry())
+                if (IsHungry() && Time.time >= nextHuntTime)
                 {
                     target = nearestCarcass != null ? nearestCarcass : nearestLiveSheep;
                     if (target != null)
+                    {
                         state = State.Chasing;
+                        chaseEndTime = Time.time + maxChaseDuration;
+                    }
                 }
-                else if (IsReadyToMate)
+                else if (!IsHungry() && IsReadyToMate)
                 {
                     TryFindMate();
                 }
                 break;
 
             case State.Chasing:
-                // Cible disparue ou partie trop loin -> abandon
-                if (target == null || FlatDistanceTo(target.transform.position) > visionRadius * 1.5f)
+                // Cible disparue, partie trop loin, ou chasse trop longue -> abandon
+                if (target == null
+                    || FlatDistanceTo(target.transform.position) > visionRadius * 1.5f
+                    || Time.time >= chaseEndTime)
                 {
-                    StartWandering();
+                    GiveUpHunt();
                 }
-                else if (FlatDistanceTo(target.transform.position) <= catchDistance)
+                else if (IsInReach(target))
                 {
                     if (target.IsDead)
                     {
@@ -304,6 +320,13 @@ public class WolfBehaviour : MonoBehaviour
         mate = null;
         wanderHeading = transform.eulerAngles.y;    // repart dans la direction ou il regarde
         nextTurnTime = Time.time + Random.Range(minTurnDelay, maxTurnDelay);
+    }
+
+    // Chasse ratee : il souffle un peu avant de pouvoir rechasser
+    private void GiveUpHunt()
+    {
+        nextHuntTime = Time.time + restAfterFailedChase;
+        StartWandering();
     }
 
     private void StartEating()
@@ -388,7 +411,7 @@ public class WolfBehaviour : MonoBehaviour
 
             case State.Chasing:
                 SteerTowards(target.transform.position - transform.position, chaseTurnSpeed);
-                if (FlatDistanceTo(target.transform.position) > catchDistance)
+                if (!IsInReach(target))
                     MoveForward(chaseSpeed);
                 break;
 
@@ -503,6 +526,7 @@ public class WolfBehaviour : MonoBehaviour
         {
             animator.SetBool(IsChasingHash, false);
             animator.SetBool(IsEatingHash, false);
+            animator.SetBool(IsRestingHash, false);
             animator.SetTrigger(DieHash);
         }
 
