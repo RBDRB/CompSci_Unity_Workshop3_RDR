@@ -63,12 +63,20 @@ MonoBehaviour:
   chaseTurnSpeed: 270
   catchDistance: 1
   maxEnergy: 100
-  energyLossPerSecond: 3
+  energyLossPerSecond: 2
   hungerThreshold: 60
   biteSize: 15
+  adultAge: 40
+  newbornScale: 0.5
+  mateEnergyThreshold: 80
+  mateEnergyCost: 30
+  mateCooldown: 40
+  mateDistance: 1.5
+  mateDuration: 3
   animator: {fileID: 0}
   state: 0
   energy: 0
+  age: 0
 --- !u!1001 &3638014521867167784
 PrefabInstance:
   m_ObjectHideFlags: 0

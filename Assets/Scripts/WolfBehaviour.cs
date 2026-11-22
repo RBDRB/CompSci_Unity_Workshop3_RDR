@@ -62,6 +62,7 @@ public class WolfBehaviour : MonoBehaviour
     private static readonly int IsEatingHash = Animator.StringToHash("IsEating");
     private static readonly int AttackHash = Animator.StringToHash("Attack");
     private static readonly int DieHash = Animator.StringToHash("Die");
+    private static readonly int IsRestingHash = Animator.StringToHash("IsResting");
 
     // ----- Lus par les autres animaux -----
     public bool IsDead => state == State.Dead;
@@ -516,6 +517,7 @@ public class WolfBehaviour : MonoBehaviour
 
         animator.SetBool(IsChasingHash, state == State.Chasing);
         animator.SetBool(IsEatingHash, state == State.Attacking || state == State.Eating);
+        animator.SetBool(IsRestingHash, state == State.Mating);
     }
 
     // Duree d'un clip de WolfAnimator, pour caler le code sur l'animation

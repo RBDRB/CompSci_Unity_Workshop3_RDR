@@ -535,8 +535,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Simulation
   sheepPrefab: {fileID: 5941024743706872881, guid: 6aaaf88f7e60dc54a9a0fd0560ba4d96, type: 3}
   wolfPrefab: {fileID: 8317351119023202228, guid: 17c4998355e458148bb6e53ada550d6e, type: 3}
-  initialSheep: 10
-  initialWolves: 2
+  initialSheep: 20
+  initialWolves: 3
   fieldHalfSize: 20
   groupSpawnRadius: 5
   minDistanceBetweenGroups: 25

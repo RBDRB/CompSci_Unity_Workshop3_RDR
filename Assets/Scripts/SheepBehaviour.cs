@@ -28,7 +28,7 @@ public class SheepBehaviour : MonoBehaviour
     [Header("Fuite")]
     [SerializeField] private float wolfDetectionRadius = 7f;
     [SerializeField] private float fleeSpeed = 3.5f;
-    [SerializeField] private float fleeTurnSpeed = 360f;
+    [SerializeField] private float fleeTurnSpeed = 180f;
 
     [Header("Energie")]
     [SerializeField] private float maxEnergy = 100f;
