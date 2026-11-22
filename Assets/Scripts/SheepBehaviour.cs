@@ -41,6 +41,7 @@ public class SheepBehaviour : MonoBehaviour
     [SerializeField] private float visionRadius = 6f;
     [SerializeField] private float eatDistance = 1f;
     [SerializeField] private float eatDuration = 2f;
+    [SerializeField] private float maxSeekFoodDuration = 6f; // touffe pas atteinte : il abandonne
 
     [Header("Croissance")]
     [SerializeField] private float adultAge = 30f;           // secondes avant de pouvoir se reproduire
@@ -94,6 +95,8 @@ public class SheepBehaviour : MonoBehaviour
     private Quaternion targetRotation;
     private Grass targetGrass;
     private float eatEndTime;
+    private float seekFoodEndTime;
+    private Grass lastFailedGrass;                           // touffe abandonnee : il ne la revise pas tout de suite
     private float panicAngle;                                // ecart de fuite, tire au debut de chaque fuite
 
     private SheepBehaviour mate;                             // partenaire choisi
@@ -199,8 +202,8 @@ public class SheepBehaviour : MonoBehaviour
         foreach (Collider hit in hits)
         {
             Grass grass = hit.GetComponent<Grass>();
-            if (grass == null || grass.IsEaten)
-                continue;                       // ce collider n'est pas de l'herbe
+            if (grass == null || !grass.IsAvailableFor(this) || grass == lastFailedGrass)
+                continue;                       // pas de l'herbe, deja visee par un autre, ou abandonnee
 
             float d = FlatDistanceTo(grass.transform.position);
             if (d < bestDistance)
@@ -243,9 +246,14 @@ public class SheepBehaviour : MonoBehaviour
                 // Priorite : manger avant de se reproduire
                 if (IsHungry())
                 {
-                    targetGrass = FindNearestGrass();
-                    if (targetGrass != null)
+                    Grass grass = FindNearestGrass();
+                    if (grass != null && grass.TryReserve(this))   // la touffe devient la sienne
+                    {
+                        targetGrass = grass;
+                        lastFailedGrass = null;         // il ne boude qu'une seule touffe a la fois
                         state = State.SeekingFood;
+                        seekFoodEndTime = Time.time + maxSeekFoodDuration;
+                    }
                 }
                 else if (IsReadyToMate)
                 {
@@ -254,8 +262,14 @@ public class SheepBehaviour : MonoBehaviour
                 break;
 
             case State.SeekingFood:
-                if (targetGrass == null)        // un autre mouton l'a mangee
+                if (targetGrass == null)
                 {
+                    StartWandering();
+                }
+                else if (Time.time >= seekFoodEndTime)  // bloque trop longtemps : abandon
+                {
+                    lastFailedGrass = targetGrass;
+                    ReleaseGrass();
                     StartWandering();
                 }
                 else if (FlatDistanceTo(targetGrass.transform.position) <= eatDistance)
@@ -266,11 +280,15 @@ public class SheepBehaviour : MonoBehaviour
                 break;
 
             case State.Eating:
-                if (Time.time >= eatEndTime)
+                if (targetGrass == null)
                 {
-                    if (targetGrass != null)
-                        GainEnergy(targetGrass.BeEaten());
+                    StartWandering();
+                }
+                else if (Time.time >= eatEndTime)
+                {
+                    GainEnergy(targetGrass.BeEaten());
                     targetGrass = null;
+                    lastFailedGrass = null;
                     StartWandering();
                 }
                 break;
@@ -316,9 +334,17 @@ public class SheepBehaviour : MonoBehaviour
     private void StartFleeing()
     {
         state = State.Fleeing;
-        targetGrass = null;
+        ReleaseGrass();
         mate = null;                                // le partenaire verra que l'on ne le courtise plus
         panicAngle = Random.Range(-maxPanicAngle, maxPanicAngle);
+    }
+
+    // Libere la touffe visee pour que d'autres moutons puissent la manger
+    private void ReleaseGrass()
+    {
+        if (targetGrass != null)
+            targetGrass.Release(this);
+        targetGrass = null;
     }
 
     // ================= Reproduction =================
@@ -426,7 +452,9 @@ public class SheepBehaviour : MonoBehaviour
         }
 
         Vector3 wanderDirection = Quaternion.Euler(0f, wanderHeading, 0f) * Vector3.forward;
-        SteerTowards(wanderDirection + HerdDirection(), turnSpeed);
+        // Affame : le troupeau le retient moins, il s'ecarte pour chercher de l'herbe ailleurs
+        float herdInfluence = IsHungry() ? 0.3f : 1f;
+        SteerTowards(wanderDirection + HerdDirection() * herdInfluence, turnSpeed);
         MoveForward(speed);
     }
 
@@ -515,7 +543,7 @@ public class SheepBehaviour : MonoBehaviour
 
         Debug.Log(name + " : " + cause);
         state = State.Dead;
-        targetGrass = null;
+        ReleaseGrass();
         mate = null;
         deathTime = Time.time;
 

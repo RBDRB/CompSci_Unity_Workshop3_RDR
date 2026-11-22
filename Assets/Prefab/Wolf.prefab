@@ -52,20 +52,22 @@ MonoBehaviour:
   maxTurnDelay: 9
   maxWanderAngle: 60
   sharpTurnSpeedFactor: 0.2
-  fieldHalfSize: 20
+  fieldHalfSize: 30
   bodyRadius: 0.6
   packRadius: 10
   personalSpace: 3
   cohesionWeight: 1.5
   separationWeight: 3
   alignmentWeight: 0.5
-  visionRadius: 10
-  chaseSpeed: 4
+  visionRadius: 8
+  chaseSpeed: 4.2
   chaseTurnSpeed: 270
-  catchDistance: 1
+  catchReach: 0.3
+  maxChaseDuration: 12
+  restAfterFailedChase: 4
   maxEnergy: 100
   energyLossPerSecond: 2
-  hungerThreshold: 60
+  hungerThreshold: 55
   biteSize: 15
   adultAge: 40
   newbornScale: 0.5

@@ -457,10 +457,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GrassSpawner
   grassPrefab: {fileID: 958382530065299478, guid: 00128a125f7b9084f9edbe290d5c0ee9, type: 3}
-  initialCount: 80
+  initialCount: 100
   maxCount: 200
   regrowInterval: 1
-  fieldHalfSize: 20
+  fieldHalfSize: 30
 --- !u!4 &1509686289
 Transform:
   m_ObjectHideFlags: 0
@@ -535,13 +535,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Simulation
   sheepPrefab: {fileID: 5941024743706872881, guid: 6aaaf88f7e60dc54a9a0fd0560ba4d96, type: 3}
   wolfPrefab: {fileID: 8317351119023202228, guid: 17c4998355e458148bb6e53ada550d6e, type: 3}
-  initialSheep: 20
-  initialWolves: 3
-  fieldHalfSize: 20
+  initialSheep: 30
+  initialWolves: 4
+  fieldHalfSize: 30
   groupSpawnRadius: 5
-  minDistanceBetweenGroups: 25
-  maxSheep: 80
-  maxWolves: 15
+  minDistanceBetweenGroups: 20
+  maxSheep: 40
+  maxWolves: 10
   plot: {fileID: 808417617}
   recordInterval: 1
 --- !u!1 &1839410968

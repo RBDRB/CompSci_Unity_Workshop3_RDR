@@ -6,11 +6,32 @@ public class Grass : MonoBehaviour
 
     public bool IsEaten { get; private set; }   // lisible par les autres, modifiable seulement ici
 
-    // Appelée par le mouton. Renvoie l'énergie gagnée.
+    private SheepBehaviour reservedBy;           // le mouton qui vise cette touffe
+
+    // Libre pour ce mouton : pas mangee, et personne d'autre ne la vise
+    public bool IsAvailableFor(SheepBehaviour sheep) =>
+        !IsEaten && (reservedBy == null || reservedBy == sheep);
+
+    public bool TryReserve(SheepBehaviour sheep)
+    {
+        if (!IsAvailableFor(sheep))
+            return false;
+
+        reservedBy = sheep;
+        return true;
+    }
+
+    public void Release(SheepBehaviour sheep)
+    {
+        if (reservedBy == sheep)
+            reservedBy = null;
+    }
+
+    // Appelee par le mouton. Renvoie l'energie gagnee.
     public float BeEaten()
     {
         if (IsEaten)
-            return 0f;          // deux moutons sur la même touffe : un seul en profite
+            return 0f;
 
         IsEaten = true;
         Destroy(gameObject);
