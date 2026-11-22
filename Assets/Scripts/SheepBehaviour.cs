@@ -26,9 +26,11 @@ public class SheepBehaviour : MonoBehaviour
     [SerializeField] private float alignmentWeight = 0.5f;   // envie d'aller dans le meme sens que les voisins
 
     [Header("Fuite")]
-    [SerializeField] private float wolfDetectionRadius = 7f;
+    [SerializeField] private float fleeStartRadius = 5f;     // un loup plus pres : panique
+    [SerializeField] private float fleeSafeRadius = 12f;     // plus aucun loup dans ce rayon : il se calme
     [SerializeField] private float fleeSpeed = 3.5f;
     [SerializeField] private float fleeTurnSpeed = 180f;
+    [SerializeField] private float maxPanicAngle = 35f;      // ecart au hasard : le troupeau s'eparpille en eventail
 
     [Header("Energie")]
     [SerializeField] private float maxEnergy = 100f;
@@ -79,9 +81,10 @@ public class SheepBehaviour : MonoBehaviour
 
     private bool IsAdult => age >= adultAge;
 
-    // Remplies a chaque image par ScanSurroundings() (animaux vivants seulement)
+    // Remplis a chaque image par ScanSurroundings() (animaux vivants seulement)
     private readonly List<SheepBehaviour> neighbours = new List<SheepBehaviour>();
-    private readonly List<WolfBehaviour> visibleWolves = new List<WolfBehaviour>();
+    private readonly List<WolfBehaviour> visibleWolves = new List<WolfBehaviour>();  // dans fleeSafeRadius
+    private float nearestWolfDistance;
 
     private Simulation simulation;                           // pour faire naitre les agneaux
     private bool isNewborn;
@@ -91,6 +94,7 @@ public class SheepBehaviour : MonoBehaviour
     private Quaternion targetRotation;
     private Grass targetGrass;
     private float eatEndTime;
+    private float panicAngle;                                // ecart de fuite, tire au debut de chaque fuite
 
     private SheepBehaviour mate;                             // partenaire choisi
     private bool isLeader;                                   // celui des deux qui fait naitre l'agneau
@@ -159,8 +163,9 @@ public class SheepBehaviour : MonoBehaviour
     {
         neighbours.Clear();
         visibleWolves.Clear();
+        nearestWolfDistance = float.MaxValue;
 
-        float radius = Mathf.Max(herdRadius, wolfDetectionRadius);
+        float radius = Mathf.Max(herdRadius, fleeSafeRadius);
         Collider[] hits = Physics.OverlapSphere(transform.position, radius);
 
         foreach (Collider hit in hits)
@@ -176,8 +181,11 @@ public class SheepBehaviour : MonoBehaviour
             }
 
             WolfBehaviour wolf = hit.GetComponent<WolfBehaviour>();
-            if (wolf != null && !wolf.IsDead && d <= wolfDetectionRadius)
+            if (wolf != null && !wolf.IsDead && d <= fleeSafeRadius)
+            {
                 visibleWolves.Add(wolf);
+                nearestWolfDistance = Mathf.Min(nearestWolfDistance, d);
+            }
         }
     }
 
@@ -214,21 +222,23 @@ public class SheepBehaviour : MonoBehaviour
     // ================= Transitions =================
     private void UpdateState()
     {
-        // Priorite absolue : un loup en vue -> fuir, quoi qu'il fasse
-        if (visibleWolves.Count > 0)
+        // ----- Priorite absolue : la fuite, avec deux seuils (hysteresis) -----
+        if (state == State.Fleeing)
         {
-            targetGrass = null;
-            mate = null;                        // le partenaire verra que l'on ne le courtise plus
-            state = State.Fleeing;
+            if (visibleWolves.Count == 0)       // plus aucun loup dans fleeSafeRadius : il se calme
+                StartWandering();
+            return;                             // sinon il continue de fuir, meme entre 5 et 12 m
+        }
+
+        if (nearestWolfDistance <= fleeStartRadius)
+        {
+            StartFleeing();
             return;
         }
 
+        // ----- Comportements normaux -----
         switch (state)
         {
-            case State.Fleeing:
-                StartWandering();               // plus aucun loup en vue
-                break;
-
             case State.Wandering:
                 // Priorite : manger avant de se reproduire
                 if (IsHungry())
@@ -301,6 +311,14 @@ public class SheepBehaviour : MonoBehaviour
         mate = null;
         wanderHeading = transform.eulerAngles.y;    // repart dans la direction ou il regarde
         nextTurnTime = Time.time + Random.Range(minTurnDelay, maxTurnDelay);
+    }
+
+    private void StartFleeing()
+    {
+        state = State.Fleeing;
+        targetGrass = null;
+        mate = null;                                // le partenaire verra que l'on ne le courtise plus
+        panicAngle = Random.Range(-maxPanicAngle, maxPanicAngle);
     }
 
     // ================= Reproduction =================
@@ -447,7 +465,8 @@ public class SheepBehaviour : MonoBehaviour
              + alignment * alignmentWeight;
     }
 
-    // S'eloigne des loups ; un loup proche compte beaucoup plus qu'un loup lointain
+    // Court a l'oppose des loups (les plus proches comptent plus), devie de son angle de panique.
+    // Les regles du troupeau sont ignorees pendant la fuite.
     private void Flee()
     {
         Vector3 away = Vector3.zero;
@@ -460,7 +479,8 @@ public class SheepBehaviour : MonoBehaviour
             away += diff / (d * d);
         }
 
-        SteerTowards(away, fleeTurnSpeed);
+        Vector3 fleeDirection = Quaternion.Euler(0f, panicAngle, 0f) * away;
+        SteerTowards(fleeDirection, fleeTurnSpeed);
         MoveForward(fleeSpeed);
     }
 
@@ -567,7 +587,6 @@ public class SheepBehaviour : MonoBehaviour
     private void SteerTowards(Vector3 desiredDirection, float degreesPerSecond)
     {
         desiredDirection = KeepInsideField(desiredDirection);
-        desiredDirection.y = 0f;
         if (desiredDirection.sqrMagnitude > 0.001f)
             targetRotation = Quaternion.LookRotation(desiredDirection);
 
@@ -575,16 +594,33 @@ public class SheepBehaviour : MonoBehaviour
             transform.rotation, targetRotation, degreesPerSecond * Time.deltaTime);
     }
 
-    // Hors du terrain : la seule direction souhaitee devient le centre
+    // Au bord du terrain : on retire seulement la partie de la direction qui sort du terrain.
+    // Le mouton longe la cloture au lieu de faire demi-tour (vers les loups, s'il fuit).
     private Vector3 KeepInsideField(Vector3 desiredDirection)
     {
-        Vector3 p = transform.position;
-        if (Mathf.Abs(p.x) <= fieldHalfSize && Mathf.Abs(p.z) <= fieldHalfSize)
+        desiredDirection.y = 0f;
+        if (desiredDirection.sqrMagnitude < 0.000001f)
             return desiredDirection;
+        desiredDirection.Normalize();
 
-        Vector3 toCenter = new Vector3(-p.x, 0f, -p.z);
-        wanderHeading = Quaternion.LookRotation(toCenter).eulerAngles.y;
-        return toCenter;
+        Vector3 p = transform.position;
+        bool corrected = false;
+
+        if (Mathf.Abs(p.x) > fieldHalfSize && desiredDirection.x * p.x > 0f)
+        {
+            desiredDirection.x = -Mathf.Sign(p.x) * 0.5f;     // petite poussee vers l'interieur
+            corrected = true;
+        }
+        if (Mathf.Abs(p.z) > fieldHalfSize && desiredDirection.z * p.z > 0f)
+        {
+            desiredDirection.z = -Mathf.Sign(p.z) * 0.5f;
+            corrected = true;
+        }
+
+        if (corrected)
+            wanderHeading = Quaternion.LookRotation(desiredDirection).eulerAngles.y;
+
+        return desiredDirection;
     }
 
     // Avance, en ralentissant quand il reste un grand angle a tourner
@@ -598,10 +634,12 @@ public class SheepBehaviour : MonoBehaviour
     void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.green;
-        Gizmos.DrawWireSphere(transform.position, visionRadius);         // herbe
+        Gizmos.DrawWireSphere(transform.position, visionRadius);     // herbe
         Gizmos.color = Color.cyan;
-        Gizmos.DrawWireSphere(transform.position, herdRadius);           // troupeau et partenaires
+        Gizmos.DrawWireSphere(transform.position, herdRadius);       // troupeau et partenaires
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(transform.position, fleeStartRadius);  // panique
         Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, wolfDetectionRadius);  // loups
+        Gizmos.DrawWireSphere(transform.position, fleeSafeRadius);   // retour au calme
     }
 }
